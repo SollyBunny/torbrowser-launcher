@@ -440,11 +440,7 @@ class Launcher(QtWidgets.QMainWindow):
         def error(message):
             self.set_state(
                 "task",
-                _(
-                    "Tor Browser Launcher doesn't understand the file format of {0}".format(
-                        self.common.paths["tarball_file"]
-                    )
-                ),
+                message,
                 ["start_over"],
                 False,
             )
@@ -663,31 +659,30 @@ class ExtractThread(QtCore.QThread):
     """
 
     success = QtCore.Signal()
-    error = QtCore.Signal()
+    error = QtCore.Signal(str)
 
     def __init__(self, common):
         super(ExtractThread, self).__init__()
         self.common = common
 
     def run(self):
-        extracted = False
         try:
             if self.common.paths["tarball_file"][-2:] == "xz":
                 # if tarball is .tar.xz
                 xz = lzma.LZMAFile(self.common.paths["tarball_file"])
                 tf = tarfile.open(fileobj=xz)
                 tf.extractall(self.common.paths["tbb"]["dir"])
-                extracted = True
-            else:
+                self.success.emit()
+            elif tarfile.is_tarfile(self.common.paths["tarball_file"]):
                 # if tarball is .tar.gz
-                if tarfile.is_tarfile(self.common.paths["tarball_file"]):
-                    tf = tarfile.open(self.common.paths["tarball_file"])
-                    tf.extractall(self.common.paths["tbb"]["dir"])
-                    extracted = True
-        except:
-            pass
-
-        if extracted:
-            self.success.emit()
-        else:
-            self.error.emit()
+                tf = tarfile.open(self.common.paths["tarball_file"])
+                tf.extractall(self.common.paths["tbb"]["dir"])
+                self.success.emit()
+            else:
+                self.error.emit(_(
+                    "Tor Browser Launcher doesn't understand the file format of {0}".format(
+                        self.common.paths["tarball_file"]
+                    )
+                ))
+        except Exception as e:
+            self.error.emit(str(e))
